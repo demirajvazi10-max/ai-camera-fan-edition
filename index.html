@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="AI Camera">
+<title>AI Camera — Fan Edition</title>
+<style>
+  :root {
+    --bg: #0a0a0a;
+    --surface: #1c1c1e;
+    --surface2: #2c2c2e;
+    --border: #3a3a3c;
+    --text: #f2f2f7;
+    --text2: #aeaeb2;
+    --accent: #0a84ff;
+    --green: #30d158;
+    --red: #ff453a;
+    --gold: #ffd60a;
+    --radius: 18px;
+    --radius-sm: 12px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: env(safe-area-inset-top, 20px) 16px env(safe-area-inset-bottom, 20px);
+    gap: 14px;
+    overflow-x: hidden;
+  }
+
+  /* API KEY MODAL */
+  #api-modal {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.92);
+    z-index: 200;
+    display: flex; align-items: center; justify-content: center;
+    padding: 20px;
+  }
+  #api-modal.hidden { display: none; }
+  #api-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 28px 24px;
+    width: 100%; max-width: 420px;
+    display: flex; flex-direction: column; gap: 16px;
+  }
+  #api-box h2 { font-size: 20px; font-weight: 700; text-align: center; }
+  #api-box p { font-size: 14px; color: var(--text2); line-height: 1.6; text-align: center; }
+  #api-box a { color: var(--accent); text-decoration: none; }
+  #api-input {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 14px 16px;
+    font-size: 15px;
+    color: var(--text);
+    outline: none;
+  }
+  #api-input:focus { border-color: var(--accent); }
+  #api-input::placeholder { color: var(--text2); }
+  #api-save-btn {
+    width: 100%;
+    padding: 16px;
+    border-radius: var(--radius-sm);
+    border: none;
+    background: var(--accent);
+    color: #fff;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  #api-save-btn:active { background: #006fe0; }
+  #api-error { color: var(--red); font-size: 13px; text-align: center; display: none; }
+
+  /* HEADER */
+  header {
+    width: 100%; max-width: 480px;
+    display: flex; align-items: center; justify-content: space-between;
+    padding-top: 8px;
+  }
+  header h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.4px; }
+  #settings-btn {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 50%; width: 42px; height: 42px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; font-size: 20px;
+  }
+
+  /* STATUS */
+  #status {
+    width: 100%; max-width: 480px;
+    background: var(--surface); border-radius: var(--radius-sm);
+    padding: 14px 16px; font-size: 15px; color: var(--text2);
+    text-align: center; min-height: 52px;
+    display: flex; align-items: center; justify-content: center;
+    border: 1px solid var(--border); line-height: 1.5;
+  }
+  #status.error   { color: var(--red);    border-color: #5c1f1c; background: #1e0d0c; }
+  #status.success { color: var(--green);  border-color: #1a3d24; background: #0b1f10; }
+  #status.loading { color: var(--accent); border-color: #0d2a4a; background: #061522; }
+
+  /* MODE GRID */
+  .mode-grid {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 10px; width: 100%; max-width: 480px;
+  }
+  .mode-btn {
+    padding: 14px 10px; border-radius: var(--radius-sm);
+    border: 1.5px solid var(--border); background: var(--surface);
+    font-size: 14px; font-weight: 500; color: var(--text2);
+    cursor: pointer; text-align: center; line-height: 1.4;
+    -webkit-user-select: none;
+  }
+  .mode-btn .icon { font-size: 26px; display: block; margin-bottom: 5px; }
+  .mode-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+
+  /* FAN MODE — highlighted, full-width, "passion" feature */
+  .mode-btn.fan-btn {
+    grid-column: 1 / -1;
+    background: linear-gradient(135deg, #2a1f00, #1c1c1e);
+    border-color: var(--gold);
+    color: var(--gold);
+  }
+  .mode-btn.fan-btn.active {
+    background: linear-gradient(135deg, #ffb800, #ff453a);
+    border-color: var(--gold);
+    color: #1a1a1a;
+  }
+
+  /* VIEWFINDER */
+  #viewfinder {
+    width: 100%; max-width: 480px; aspect-ratio: 4/3;
+    background: #000; border-radius: var(--radius);
+    overflow: hidden; position: relative; border: 1px solid var(--border);
+  }
+  #video { width: 100%; height: 100%; object-fit: cover; display: block; }
+  #viewfinder-hint {
+    position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%);
+    background: rgba(0,0,0,0.6); color: #fff; font-size: 12px;
+    padding: 5px 12px; border-radius: 20px; white-space: nowrap; pointer-events: none;
+  }
+  #preview-img {
+    width: 100%; max-width: 480px; border-radius: var(--radius);
+    display: none; border: 1px solid var(--border);
+  }
+  canvas { display: none; }
+
+  /* SNAP BUTTON */
+  #snap-wrap { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  #snap-btn {
+    width: 88px; height: 88px; border-radius: 50%;
+    background: #fff; border: 4px solid var(--border);
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    font-size: 38px; transition: transform 0.1s, opacity 0.15s;
+    -webkit-user-select: none;
+  }
+  #snap-btn:active { transform: scale(0.9); }
+  #snap-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+  #snap-label { font-size: 13px; color: var(--text2); }
+
+  /* RESULT */
+  #result-box {
+    width: 100%; max-width: 480px;
+    background: var(--surface); border-radius: var(--radius);
+    padding: 18px; font-size: 16px; color: var(--text);
+    line-height: 1.8; display: none; border: 1px solid var(--border);
+  }
+  #result-box h3 {
+    font-size: 12px; color: var(--text2); font-weight: 500;
+    margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.5px;
+  }
+
+  /* ACTION BUTTONS */
+  .action-row { display: flex; gap: 10px; width: 100%; max-width: 480px; }
+  .action-btn {
+    flex: 1; padding: 16px 10px; border-radius: var(--radius-sm);
+    border: 1px solid var(--border); background: var(--surface);
+    font-size: 15px; font-weight: 600; cursor: pointer;
+    display: none; align-items: center; justify-content: center;
+    gap: 7px; color: var(--text); -webkit-user-select: none;
+  }
+  .action-btn:active { background: var(--surface2); }
+  #speak-btn { background: var(--accent); border-color: var(--accent); color: #fff; }
+  #speak-btn:active { background: #006fe0; }
+
+  /* SETTINGS PANEL */
+  #settings-panel {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.75); z-index: 100;
+    align-items: flex-end; justify-content: center;
+  }
+  #settings-panel.open { display: flex; }
+  #settings-inner {
+    width: 100%; max-width: 480px;
+    background: var(--surface); border-radius: var(--radius) var(--radius) 0 0;
+    padding: 20px 20px calc(env(safe-area-inset-bottom, 0px) + 20px);
+  }
+  #settings-inner h2 { font-size: 17px; font-weight: 700; margin-bottom: 18px; text-align: center; }
+  .setting-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 0; border-bottom: 1px solid var(--border); font-size: 15px;
+  }
+  .setting-row:last-of-type { border-bottom: none; }
+  .setting-row label { color: var(--text2); font-size: 12px; margin-top: 3px; display: block; }
+  .setting-row select, .setting-row input[type=range] {
+    background: var(--surface2); color: var(--text);
+    border: 1px solid var(--border); border-radius: 8px;
+    padding: 6px 10px; font-size: 14px; max-width: 150px;
+  }
+  #change-api-btn {
+    width: 100%; padding: 13px; border-radius: var(--radius-sm);
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--red); font-size: 14px; font-weight: 600; cursor: pointer;
+    margin-top: 4px;
+  }
+  #close-settings {
+    width: 100%; margin-top: 10px; padding: 14px;
+    border-radius: var(--radius-sm); background: var(--surface2);
+    border: 1px solid var(--border); color: var(--text);
+    font-size: 16px; font-weight: 600; cursor: pointer;
+  }
+
+  .spinner {
+    display: inline-block; width: 16px; height: 16px;
+    border: 2px solid rgba(100,160,255,0.3); border-top-color: var(--accent);
+    border-radius: 50%; animation: spin 0.8s linear infinite;
+    vertical-align: middle; margin-right: 6px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<!-- API KEY MODAL -->
+<div id="api-modal" role="dialog" aria-label="Enter Gemini API key" aria-modal="true">
+  <div id="api-box">
+    <h2>🔑 Gemini API Key</h2>
+    <p>
+      Enter your Gemini API key so the app can analyze images.<br><br>
+      You can get a free key at:<br>
+      <a href="https://aistudio.google.com/app/apikey" target="_blank">aistudio.google.com</a>
+    </p>
+    <input type="password" id="api-input" placeholder="AIza..." aria-label="Gemini API key" />
+    <div id="api-error">Please enter a valid API key.</div>
+    <button id="api-save-btn" onclick="saveApiKey()">Save and continue</button>
+  </div>
+</div>
+
+<header>
+  <h1>📷 AI Camera</h1>
+  <button id="settings-btn" onclick="toggleSettings()" aria-label="Settings">⚙️</button>
+</header>
+
+<div id="status" role="status" aria-live="assertive">Starting camera...</div>
+
+<div class="mode-grid" role="group" aria-label="Choose a description mode">
+  <button class="mode-btn active" data-mode="general" onclick="setMode(this)" aria-pressed="true">
+    <span class="icon" aria-hidden="true">🔍</span>General
+  </button>
+  <button class="mode-btn" data-mode="sell" onclick="setMode(this)" aria-pressed="false">
+    <span class="icon" aria-hidden="true">🏷️</span>For Sale
+  </button>
+  <button class="mode-btn" data-mode="person" onclick="setMode(this)" aria-pressed="false">
+    <span class="icon" aria-hidden="true">🧍</span>Person
+  </button>
+  <button class="mode-btn" data-mode="text" onclick="setMode(this)" aria-pressed="false">
+    <span class="icon" aria-hidden="true">📄</span>Read Text
+  </button>
+  <button class="mode-btn fan-btn" data-mode="fan" onclick="setMode(this)" aria-pressed="false">
+    <span class="icon" aria-hidden="true">🏆</span>Fan Mode — hype up your team gear!
+  </button>
+</div>
+
+<div id="viewfinder" aria-label="Camera preview" role="img">
+  <video id="video" autoplay playsinline muted aria-hidden="true"></video>
+  <div id="viewfinder-hint" aria-hidden="true">Point the camera and press the button</div>
+</div>
+
+<img id="preview-img" alt="Photo being analyzed" />
+<canvas id="canvas" aria-hidden="true"></canvas>
+
+<div id="snap-wrap">
+  <button id="snap-btn" onclick="capture()" aria-label="Take photo">📸</button>
+  <span id="snap-label" aria-hidden="true">Press to take a photo</span>
+</div>
+
+<div id="result-box" aria-live="polite">
+  <h3>AI Description</h3>
+  <div id="result-text"></div>
+</div>
+
+<div class="action-row">
+  <button class="action-btn" id="speak-btn" onclick="speakResult()" aria-label="Read description aloud">
+    🔊 Read aloud
+  </button>
+  <button class="action-btn" id="retry-btn" onclick="resetCamera()" aria-label="New photo">
+    🔄 New photo
+  </button>
+</div>
+
+<!-- SETTINGS -->
+<div id="settings-panel" role="dialog" aria-label="Settings" aria-modal="true">
+  <div id="settings-inner">
+    <h2>Settings</h2>
+    <div class="setting-row">
+      <div>
+        <span>Speech rate</span>
+        <label>Slower ← → Faster</label>
+      </div>
+      <input type="range" id="rate-slider" min="0.5" max="1.8" step="0.1" value="0.9"
+             aria-label="Speech rate" onchange="updateRate(this.value)">
+    </div>
+    <div class="setting-row">
+      <div>
+        <span>Speech language</span>
+        <label>Reader voice</label>
+      </div>
+      <select id="voice-select" aria-label="Choose speech language" onchange="updateVoice(this.value)">
+        <option value="en-US">English</option>
+        <option value="sr-RS">Serbian</option>
+        <option value="hr-HR">Croatian</option>
+      </select>
+    </div>
+    <div class="setting-row">
+      <div>
+        <span>Auto-read</span>
+        <label>Automatically read the result after analysis</label>
+      </div>
+      <input type="checkbox" id="auto-speak" checked aria-label="Automatically read the description"
+             style="width:26px;height:26px;accent-color:var(--accent);">
+    </div>
+    <button id="change-api-btn" onclick="changeApiKey()">🔑 Change API key</button>
+    <button id="close-settings" onclick="toggleSettings()">Close</button>
+  </div>
+</div>
+
+<script>
+const video      = document.getElementById('video');
+const canvas     = document.getElementById('canvas');
+const statusEl   = document.getElementById('status');
+const snapBtn    = document.getElementById('snap-btn');
+const snapLabel  = document.getElementById('snap-label');
+const resultBox  = document.getElementById('result-box');
+const resultText = document.getElementById('result-text');
+const speakBtn   = document.getElementById('speak-btn');
+const retryBtn   = document.getElementById('retry-btn');
+const previewImg = document.getElementById('preview-img');
+const viewfinder = document.getElementById('viewfinder');
+const apiModal   = document.getElementById('api-modal');
+const apiInput   = document.getElementById('api-input');
+const apiError   = document.getElementById('api-error');
+
+let currentMode = 'general';
+let lastDesc    = '';
+let stream      = null;
+let speechRate  = 0.9;
+let speechLang  = 'en-US';
+let selVoice    = null;
+let GEMINI_KEY  = '';
+
+const STORAGE_KEY = 'gemini_api_key';
+
+const modeNames = {
+  general: 'General description',
+  sell:    'For sale listing',
+  person:  'Person description',
+  text:    'Read text',
+  fan:     'Fan Mode'
+};
+
+const prompts = {
+  general: 'Describe in detail what you see in this image. Mention all objects, colors, people, text, and the room. Speak precisely, as if describing it to someone who cannot see. Answer in English.',
+  sell:    'Analyze the object in the image as if writing a for-sale listing. Include: name, color, condition (damage, scratches), and any details important for a buyer. Be specific. Answer in English.',
+  person:  'Describe the person or people in the image: how many, estimated age, clothing and colors, hair, general appearance. Do not state a name. Answer in English.',
+  text:    'Read aloud all the text visible in the image, word for word. If there is no text, say so. Answer in English.',
+  fan:     'You are a hyped-up sports commentator at a stadium. Look at this image — it might be a jersey, scarf, flag, banner, stadium, or fan gear — and describe it with pure excitement and passion, like you are hyping up the crowd before a big match. Call out colors, team details, logos, and anything that shows team spirit. Keep it fun, energetic, and short (2-4 sentences). Answer in English.'
+};
+
+// --- API KEY ---
+function loadApiKey() {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      GEMINI_KEY = saved;
+      apiModal.classList.add('hidden');
+      startCamera();
+    } else {
+      apiModal.classList.remove('hidden');
+      setTimeout(() => apiInput.focus(), 300);
+    }
+  } catch(e) {
+    apiModal.classList.remove('hidden');
+  }
+}
+
+function saveApiKey() {
+  const key = apiInput.value.trim();
+  if (!key || key.length < 10) {
+    apiError.style.display = 'block';
+    speak('Please enter a valid API key.', true);
+    return;
+  }
+  apiError.style.display = 'none';
+  GEMINI_KEY = key;
+  try { localStorage.setItem(STORAGE_KEY, key); } catch(e) {}
+  apiModal.classList.add('hidden');
+  speak('API key saved. Starting camera.', true);
+  startCamera();
+}
+
+function changeApiKey() {
+  toggleSettings();
+  GEMINI_KEY = '';
+  try { localStorage.removeItem(STORAGE_KEY); } catch(e) {}
+  apiInput.value = '';
+  apiModal.classList.remove('hidden');
+  setTimeout(() => apiInput.focus(), 300);
+}
+
+// Allow Enter key on the input field
+apiInput.addEventListener('keydown', e => { if (e.key === 'Enter') saveApiKey(); });
+
+// --- VOICE ---
+function loadVoices() {
+  const voices = window.speechSynthesis.getVoices();
+  selVoice = voices.find(v => v.lang.startsWith('en')) ||
+             voices.find(v => v.lang.startsWith('sr')) ||
+             voices.find(v => v.lang.startsWith('hr')) || null;
+}
+window.speechSynthesis.onvoiceschanged = loadVoices;
+loadVoices();
+
+function speak(text, cancel) {
+  if (!window.speechSynthesis) return;
+  if (cancel) speechSynthesis.cancel();
+  const utt = new SpeechSynthesisUtterance(text);
+  utt.lang = speechLang;
+  utt.rate = speechRate;
+  if (selVoice) utt.voice = selVoice;
+  speechSynthesis.speak(utt);
+}
+
+function updateRate(val) { speechRate = parseFloat(val); speak('Rate: ' + val, true); }
+function updateVoice(lang) {
+  speechLang = lang;
+  const voices = window.speechSynthesis.getVoices();
+  selVoice = voices.find(v => v.lang.startsWith(lang.split('-')[0])) || null;
+  speak('Voice changed.', true);
+}
+
+// --- UI ---
+function setStatus(msg, cls) { statusEl.innerHTML = msg; statusEl.className = cls || ''; }
+
+function setMode(btn) {
+  document.querySelectorAll('.mode-btn').forEach(b => {
+    b.classList.remove('active');
+    b.setAttribute('aria-pressed', 'false');
+  });
+  btn.classList.add('active');
+  btn.setAttribute('aria-pressed', 'true');
+  currentMode = btn.dataset.mode;
+  speak('Mode: ' + modeNames[currentMode], true);
+}
+
+function toggleSettings() {
+  const p = document.getElementById('settings-panel');
+  const opening = !p.classList.contains('open');
+  p.classList.toggle('open');
+  speak(opening ? 'Settings opened.' : 'Settings closed.', true);
+}
+
+// --- CAMERA ---
+async function startCamera() {
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1440 } },
+      audio: false
+    });
+    video.srcObject = stream;
+    await video.play();
+    setStatus('Ready — press the button to take a photo', 'success');
+    speak('The app is ready. Choose a mode and press the button to take a photo.', true);
+    snapBtn.disabled = false;
+    snapLabel.textContent = 'Press to take a photo';
+  } catch (e) {
+    setStatus('Camera not available. Go to Settings → Safari → Camera → Allow.', 'error');
+    speak('Error. Camera not available.', true);
+    snapBtn.disabled = true;
+  }
+}
+
+function capture() {
+  if (snapBtn.disabled) return;
+  snapBtn.disabled = true;
+  snapLabel.textContent = 'Analyzing...';
+  setStatus('<span class="spinner"></span>Analyzing image, please wait...', 'loading');
+  speak('Taking the photo and analyzing it. Please wait.', true);
+
+  canvas.width  = video.videoWidth  || 1280;
+  canvas.height = video.videoHeight || 960;
+  canvas.getContext('2d').drawImage(video, 0, 0);
+
+  const dataUrl = canvas.toDataURL('image/jpeg', 0.88);
+  previewImg.src = dataUrl;
+  previewImg.style.display = 'block';
+  viewfinder.style.display = 'none';
+  if (stream) stream.getTracks().forEach(t => t.stop());
+
+  analyzeImage(dataUrl.split(',')[1]);
+}
+
+async function analyzeImage(base64) {
+  try {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${GEMINI_KEY}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{
+            parts: [
+              { inline_data: { mime_type: 'image/jpeg', data: base64 } },
+              { text: prompts[currentMode] }
+            ]
+          }]
+        })
+      }
+    );
+
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err?.error?.message || 'HTTP ' + res.status);
+    }
+
+    const data = await res.json();
+    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || 'No description available.';
+
+    lastDesc = text;
+    resultText.textContent = text;
+    resultBox.style.display = 'block';
+    speakBtn.style.display  = 'flex';
+    retryBtn.style.display  = 'flex';
+    setStatus('Analysis complete', 'success');
+    snapLabel.textContent = '';
+    if (document.getElementById('auto-speak').checked) speak(text, true);
+
+  } catch (e) {
+    setStatus('Error: ' + e.message, 'error');
+    speak('Error during analysis. Please try again.', true);
+    snapBtn.disabled = false;
+    snapLabel.textContent = 'Press to take a photo';
+    retryBtn.style.display = 'flex';
+  }
+}
+
+function speakResult() { if (lastDesc) speak(lastDesc, true); }
+
+function resetCamera() {
+  lastDesc = '';
+  resultBox.style.display  = 'none';
+  resultText.textContent   = '';
+  speakBtn.style.display   = 'none';
+  retryBtn.style.display   = 'none';
+  previewImg.style.display = 'none';
+  previewImg.src = '';
+  viewfinder.style.display = 'block';
+  snapBtn.disabled = false;
+  snapLabel.textContent = 'Press to take a photo';
+  setStatus('Starting camera...');
+  startCamera();
+}
+
+// Start
+loadApiKey();
+</script>
+</body>
+</html>
