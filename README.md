@@ -8,7 +8,7 @@ Built for the **DEV Weekend Challenge: Passion Edition**. Point your phone's cam
 
 ## 🔴 Try it live
 
-**[Open on your phone → your-github-pages-link-here](#)**
+**[Open on your phone → demirajvazi10-max.github.io/ai-camera-fan-edition](https://demirajvazi10-max.github.io/ai-camera-fan-edition/)**
 
 You'll need a free Gemini API key (see below) — it's entered directly in the app and never leaves your device.
 

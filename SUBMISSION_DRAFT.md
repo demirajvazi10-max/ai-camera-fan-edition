@@ -10,8 +10,8 @@
 
 ## Try it
 
-🔗 **Live app (open on your phone):** your-github-pages-link-here
-🔗 **Source code:** your-github-repo-link-here
+🔗 **Live app (open on your phone):** https://demirajvazi10-max.github.io/ai-camera-fan-edition/
+🔗 **Source code:** https://github.com/demirajvazi10-max/ai-camera-fan-edition
 
 You'll need a free Gemini API key from [aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey) — paste it in when the app asks. It's stored only in your browser and never leaves your device except to call Google's API directly.
 
